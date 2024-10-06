@@ -33,6 +33,7 @@ public:
 
     __inner::ShmMemory& mem();
 
+    static std::string get_root();
     static std::string get_node_root_path(const std::string& node);
     static std::string get_ctl_key_file  (const std::string& node, const std::string& key);
     static std::string get_data_key_file (const std::string& node, const std::string& key);

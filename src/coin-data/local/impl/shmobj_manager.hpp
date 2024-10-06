@@ -338,7 +338,7 @@ private:
     void inotify_shared_object_monitor_(const struct inotify_event& event);
 
     template<typename T>
-    bool lock_object_(SharedObjectSharedPtr<T>& data, const std::function<void()>& func);
+    static bool lock_object_(SharedObjectSharedPtr<T>& data, const std::function<void()>& func);
 
     static void clear_shm_obj_remove_map_(ExtNodeMapItem& node);
 
@@ -361,6 +361,9 @@ public:
 
     template<typename T>
     static bool lock_object(SharedObjectSharedPtr<T>& data, const std::function<void()>& func);
+
+private:
+    static std::pair<std::string, std::string> read_node_idx_(const std::string& str);
 };
 
 template <typename T>
@@ -567,16 +570,16 @@ inline ShmObjManager::SharedObjectSharedPtr<T> ShmObjManager::discovery(const st
     // get node name from name
     coin::Print::debug("discovery object: {}", name);
     std::shared_ptr<SharedObjectRetentionBase> ret;
-    std::string node, key;
-    {
-        std::size_t pos = name.find_first_of('/', 1);
-        node = name.substr(0, pos);
-        if(node[0] == '/')
-            node = node.substr(1);
 
-        key = name.substr(pos + 1);
+    auto idx = read_node_idx_(name);
+    std::string& node = idx.first;
+    std::string& key = idx.second;
+
+    std::string node_path = ShmManager::get_root();
+    if(not node.empty())
+    {
+        node_path = ShmManager::get_node_root_path(node);
     }
-    auto node_path = ShmManager::get_node_root_path(node);
 
     std::lock_guard<std::mutex> lock(node_map_mutex_);
 
@@ -657,6 +660,10 @@ inline ShmObjManager::SharedObjectSharedPtr<T> ShmObjManager::make(ArgsT &&...ar
 template <typename T>
 inline RetBool ShmObjManager::reset(SharedObjectSharedPtr<T> &obj)
 {
+    if(not obj)
+    {
+        return RetBool(false);
+    }
     ProcessLockArea<ProcessMutex> shm_obj_map_lock_area(
         *(*self_node_->second.shared_info)->shm_obj_map_mutex,
         [&obj, this]() {
@@ -672,7 +679,7 @@ inline RetBool ShmObjManager::reset(SharedObjectSharedPtr<T> &obj)
 template <typename T>
 inline bool ShmObjManager::lock_object(SharedObjectSharedPtr<T> &data, const std::function<void()> &func)
 {
-    return ShmObjManager::instance().lock_object_(data, func);
+    return ShmObjManager::lock_object_(data, func);
 }
 template <typename T>
 using Allocator = ShmObjManager::Allocator<T>;

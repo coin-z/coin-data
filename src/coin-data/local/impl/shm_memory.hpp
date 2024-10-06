@@ -152,28 +152,35 @@ public:
             if(not locked_func) return;
 
             // try to lock
-            while(0 != m_.timedlock(timeout))
+            /** @todo NOTE: how to handle timeout? when holder process is died,
+                     how to unlock it?
+            */
+            int r = 0;
+            while(0 != (r = m_.timedlock(timeout)))
             {
                 coin::Print::warn("lock {} timeout", m_.holder());
                 // lock required timeout, check holder exist or not
                 if(m_.holder() != 0 and kill(m_.holder(), 0) == 0)
                 {
-                    coin::Print::debug("lock {} still working, continue wait for it.", m_.holder());
-                    continue;
-                }
-                else if(kill(m_.owener_pid_, 0) != 0)
-                {
-                    coin::Print::debug("lock {} owener is died, forgive lock.", m_.holder());
-                    m_.is_died_ = true;
-                    m_.unlock();
+                    coin::Print::debug("lock {}({:X}) still working, continue wait for it.", m_.holder(), (uint64_t)&m_);
                     continue;
                 }
                 else
                 {
-                    coin::Print::debug("holder {} is died, unlock.", m_.holder());
-                    m_.unlock();
-                    continue;
+                    // lock holder is died, fix lock here.
+                    pthread_mutex_consistent(&m_.mutex_);
                 }
+                if(kill(m_.owener_pid_, 0) != 0)
+                {
+                    coin::Print::debug("lock {} owener is died, forgive lock.", m_.holder());
+                    m_.is_died_ = true;
+                }
+                if(failed_func)
+                {
+                    coin::Print::debug("{} call failed_func()", m_.holder());
+                    failed_func();
+                }
+                return;
             }
 
             if(not m_.is_died_)

@@ -440,6 +440,30 @@ void ShmObjManager::clear_shm_obj_remove_map_(ExtNodeMapItem& node)
     }
     coin::Print::debug("size of obj removed map after clear: {}", obj_removed_map->size());
 }
+std::pair<std::string, std::string> ShmObjManager::read_node_idx_(const std::string &str)
+{
+    std::pair<std::string, std::string> ret;
+    if(str.empty()) return std::move(ret);
+    // check str is start with '/',
+    // if true read first word as node name, else discory all exist node.
+    if(str[0] == '/')
+    {
+        std::size_t pos = str.find_first_of('/', 1);
+        auto node = str.substr(0, pos);
+        if(node[0] == '/')
+            node = node.substr(1);
+
+        auto key = str.substr(pos + 1);
+        ret.first = node;
+        ret.second = key;
+    }
+    else
+    {
+        ret.second = str;
+    }
+
+    return std::move(ret);
+}
 void ShmObjManager::clear_invalid_shm_(const std::string &node)
 {
     std::regex node_regex("[0-9]+");

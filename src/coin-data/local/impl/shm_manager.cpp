@@ -24,6 +24,11 @@ constexpr char shm_root_path[] = "/dev/shm/coin/";
 constexpr std::size_t ctrl_mem_size = coin::data::__inner::ShmMemory::PAGE_SIZE;         // 4k
 constexpr std::size_t data_mem_size = coin::data::__inner::ShmMemory::PAGE_SIZE * 25600; // 100MB
 
+std::string ShmManager::get_root()
+{
+    return shm_root_path;
+}
+
 std::string ShmManager::get_node_root_path(const std::string &node)
 {
     return (shm_root_path + node);

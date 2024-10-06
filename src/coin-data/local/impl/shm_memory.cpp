@@ -88,15 +88,40 @@ ShmMemory::ProcessMutex::ProcessMutex()
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK_NP);
+    pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST);
     pthread_mutex_init(&mutex_, &attr);
 }
 ShmMemory::ProcessMutex::~ProcessMutex()
 {
-    if(0 != holder_pid_)
+    if(0 != holder())
     {
-        pthread_mutex_unlock(&mutex_);
+        coin::Print::error("relase mutex failed: mutex is still using by: {}", holder());
+        abort();
     }
-    pthread_mutex_destroy(&mutex_);
+    /**
+     * @brief if pthread_mutex_destroy return EBUSY,
+     *         it means mutex is used by other process,
+     *         so we should wait it finish.
+     *         just for destroy mutex safely, but it's not a good way.
+     *         NOTE: reimplement it.
+     */
+    int r = 0;
+    while((r = pthread_mutex_destroy(&mutex_)) == EBUSY)
+    {
+        coin::Print::debug("mutex is busy, using by: {}, owener: {}, ret: {}, {:X}", holder(), owener_pid_, r, (uint64_t)this);
+        if(0 != holder())
+        {
+            coin::Print::error("destroy mutex failed: mutex is still using by: {}", holder());
+            abort();
+        }
+        usleep(100);
+    }
+    if(r != 0)
+    {
+        coin::Print::error("mutex destroy failed({}): {} {}", r, holder(), owener_pid_);
+        abort();
+    }
 }
 bool ShmMemory::ProcessMutex::lock()
 {
@@ -109,6 +134,11 @@ bool ShmMemory::ProcessMutex::lock()
 }
 bool ShmMemory::ProcessMutex::unlock()
 {
+    if(holder_pid_ == 0)
+    {
+        coin::Print::error("unlock failed: holder_pid_ == 0");
+        abort();
+    }
     holder_pid_ = 0;
     int r = pthread_mutex_unlock(&mutex_);
     if(EINVAL == r)
@@ -119,7 +149,7 @@ bool ShmMemory::ProcessMutex::unlock()
     }
     else if(0 != r)
     {
-        coin::Print::error("unlock failed: {}", r);
+        coin::Print::error("unlock failed: {}({})", strerror(r), r);
         abort();
         return false;
     }
@@ -141,6 +171,10 @@ int ShmMemory::ProcessMutex::timedlock(int ms)
     else if(ret == ETIMEDOUT)
     {
 
+    }
+    else if(ret == EINVAL /* 22 */)
+    {
+        
     }
     else
     {
