@@ -178,7 +178,7 @@ int ShmMemory::ProcessMutex::timedlock(int ms)
     }
     else
     {
-        coin::Print::error("Unknown error({}), {}, {}.\n", ret, timeout.tv_sec, timeout.tv_nsec);
+        coin::Print::error("{}({}), {}, {}.\n", strerror(ret), ret, timeout.tv_sec, timeout.tv_nsec);
         abort();
     }
     return ret;

@@ -174,33 +174,13 @@ bool ShmObjManager::discovery_shm_(const std::string &node, const std::string &k
         coin::Print::debug("check file: {}", p.path().filename().string());
         if(not p.is_regular_file() or not std::regex_match(p.path().filename().string(), node_regex))
         { continue; }
-
-        // check node is alive, if not alive, jump to next
-        pid_t pid = std::atoi(p.path().filename().string().c_str());
-        coin::Print::debug("check process alive pid: {}", pid);
-        if(kill(pid, 0) != 0)
-        {
-            coin::Print::debug("<{}:{}> is not alive, jump it.", node, pid);
-            continue;
-        }
-
-        // get file name
         auto file_name = p.path().string();
-        if(not FileMapObject<ShmSystemSharedInfo>::is_valid(file_name))
+
+        // check file exist, if not exist ignore this event
+        if(not std::filesystem::exists(file_name))
         {
-            // file of shm is not valid anymore, no one can use it, just remove it here.
-            auto ctl = ShmManager::get_ctl_key_file(node, p.path().filename().string());
-            auto data = ShmManager::get_data_key_file(node, p.path().filename().string());
-            std::filesystem::remove(ctl);
-            std::filesystem::remove(data);
-
-            coin::Print::debug("{} is not valid, remove {} and {}", file_name, ctl, data);
-
             continue;
         }
-
-        coin::Print::debug("discover node file: {}", file_name);
-        std::pair<std::shared_ptr<FileMapObject<ShmSystemSharedInfo>>, std::shared_ptr<ShmManager>> shared_shm_manager;
 
         static auto make_shared_shm_manager_ = [](const std::string& file_name, const std::string& node, const std::string& key)
         -> std::pair<std::shared_ptr<FileMapObject<ShmSystemSharedInfo>>, std::shared_ptr<ShmManager>>
@@ -220,7 +200,41 @@ bool ShmObjManager::discovery_shm_(const std::string &node, const std::string &k
                 )
             );
         };
-        
+
+        // check node is alive, if not alive, jump to next
+        pid_t pid = std::atoi(p.path().filename().string().c_str());
+        coin::Print::debug("check process alive pid: {}", pid);
+        if(kill(pid, 0) != 0)
+        {
+            coin::Print::debug("<{}:{}> is not alive, remove resource and jump it.", node, pid);
+            // remove resource
+            auto ctl = ShmManager::get_ctl_key_file(node, p.path().filename().string());
+            auto data = ShmManager::get_data_key_file(node, p.path().filename().string());
+
+            auto shared_shm_manager = make_shared_shm_manager_(file_name, node, key);
+
+            std::filesystem::remove(ctl);
+            std::filesystem::remove(data);
+            continue;
+        }
+
+        // get file name
+        if(not FileMapObject<ShmSystemSharedInfo>::is_valid(file_name))
+        {
+            // file of shm is not valid anymore, no one can use it, just remove it here.
+            auto ctl = ShmManager::get_ctl_key_file(node, p.path().filename().string());
+            auto data = ShmManager::get_data_key_file(node, p.path().filename().string());
+            std::filesystem::remove(ctl);
+            std::filesystem::remove(data);
+
+            coin::Print::debug("{} is not valid, remove {} and {}", file_name, ctl, data);
+
+            continue;
+        }
+
+        coin::Print::debug("discover node file: {}", file_name);
+        std::pair<std::shared_ptr<FileMapObject<ShmSystemSharedInfo>>, std::shared_ptr<ShmManager>> shared_shm_manager;
+
         auto node_itor = node_map_.find(node);
         if(node_itor == node_map_.end())
         {

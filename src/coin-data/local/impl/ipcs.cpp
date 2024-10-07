@@ -20,12 +20,15 @@
 #include <sys/shm.h>
 
 #include <coin-commons/utils/utils.hpp>
+#include <coin-commons/utils/file_lock.hpp>
 
 namespace coin::data
 {
 Shm::Shm(const std::string& key, size_t size, const void* addr)
   : shm_(std::make_unique<coin::ipc::Shm>(key, size, addr))
 {
+    auto flock_fd = open(key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    coin::FileLock::lock(flock_fd);
     int ret = 0;
     // check whether shared memory exists, 
     // if exists and not mounted, destroy it
@@ -51,6 +54,8 @@ Shm::Shm(const std::string& key, size_t size, const void* addr)
     // buddy memory check
     buddy_memory_check(*addr, size);
     #endif
+    coin::FileLock::unlock(flock_fd);
+    close(flock_fd);
 }
 Shm::~Shm()
 {
