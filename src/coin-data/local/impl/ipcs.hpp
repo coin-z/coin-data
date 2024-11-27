@@ -33,6 +33,8 @@ public:
 
     inline const std::string key_file() const { return shm_->key_file(); }
 
+    static void check_and_remove(const std::string& key_file) { coin::ipc::Shm::check_and_remove(key_file); }
+
 private:
     std::unique_ptr<coin::ipc::Shm> shm_;
 }; // class Shm

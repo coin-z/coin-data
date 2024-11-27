@@ -58,6 +58,10 @@ public:
     pointer allocate (size_type n)
     {
         pointer ptr = (pointer)MemManagerT::instance().mem().malloc(n * sizeof(T));
+        if((uint64_t)ptr == 0x7fff00000002)
+        {
+            throw std::bad_alloc();
+        }
         if(not ptr)
         {
             coin::Print::error("allocate memory failed.");
@@ -68,7 +72,11 @@ public:
 
     void deallocate (pointer p, size_type n)
     {
-        MemManagerT::instance().mem().free(p);
+        if(not MemManagerT::instance().mem().free(p))
+        {
+            coin::Print::error("deallocate memory failed.");
+            throw std::runtime_error("deallocate memory failed.");
+        }
     }
 
     size_type max_size() const noexcept { return __LONG_MAX__; }

@@ -46,9 +46,9 @@ Shm::Shm(const std::string& key, size_t size, const void* addr)
     if(addr != nullptr && shm_->addr() != addr)
     {
         coin::Print::error("create memory is not match({}:{})", shm_->addr(), addr);
-        shm_->destroy();
         throw std::runtime_error("create memory is not match");
     }
+    coin::Print::info("create shared memory success: {}", shm_->addr());
 
     #if 0
     // buddy memory check

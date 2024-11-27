@@ -11,10 +11,7 @@
 
 #pragma once
 #include <stddef.h>
-
-#include <coin-data/communicator_type.hpp>
 #include <coin-data/local/local_channal.hpp>
-
 
 namespace coin::data
 { 
@@ -52,29 +49,33 @@ public:
     Communicator& operator=(const Communicator&) = delete;
     ~Communicator();
 
-    static void init(int argc, char *argv[]);
-
-    static void spin_once();
+    static void init(int argc, char *argv[], const std::string& name = "");
 
     static const std::string& node_name();
 
     template<typename DataT>
-    [[nodiscard]] static typename Writer<DataT>::Ptr writer(const std::string& name);
+    [[nodiscard]] static typename Writer<DataT>::Ptr
+    writer(const std::string& name);
 
     template<typename DataT>
-    [[nodiscard]] static typename Reader<DataT>::Ptr reader(const std::string& name);
+    [[nodiscard]] static typename Reader<DataT>::Ptr
+    reader(const std::string& name);
 
     template<typename DataT>
-    [[nodiscard]] static typename Publisher<DataT>::Ptr publisher(const std::string& name, const std::size_t& bs = 10);
+    [[nodiscard]] static typename Publisher<DataT>::Ptr
+    publisher(const std::string& name, const std::size_t& bs = 10);
 
     template<typename DataT>
-    [[nodiscard]] static typename Subscriber<DataT>::Ptr subscriber(const std::string& name, const typename Subscriber<DataT>::Callback& cb, const std::size_t &bs = 10);
+    [[nodiscard]] static typename Subscriber<DataT>::Ptr
+    subscriber(const std::string& name, const typename Subscriber<DataT>::Callback& cb, const std::size_t &bs = 10);
 
     template<typename ReqT, typename AckT>
-    [[nodiscard]] static typename Service<ReqT, AckT>::Ptr service(const std::string& name, const typename Service<ReqT, AckT>::Callback& cb, const std::size_t &bs = 10);
+    [[nodiscard]] static typename Service<ReqT, AckT>::Ptr
+    service(const std::string& name, const typename Service<ReqT, AckT>::Callback& cb, const std::size_t &bs = 10);
 
     template<typename ReqT, typename AckT>
-    [[nodiscard]] static typename Client<ReqT, AckT>::Ptr client(const std::string& name, const std::size_t& bs = 10);
+    [[nodiscard]] static typename Client<ReqT, AckT>::Ptr
+    client(const std::string& name, const std::size_t& bs = 10);
 
     struct MutableServerReq
     {
@@ -95,43 +96,49 @@ private:
 
     static void register_mutable_communicator_(const std::string& id, const MutableCommunicator::Ptr& mc);
     static bool mutable_communicator_service_callback_(
-        Service<MutableServerReq, MutableServerAck>::ConstReqPtr& req,
-        Service<MutableServerReq, MutableServerAck>::AckPtr& ack
+        const MutableServerReq& req,
+        MutableServerAck& ack
     );
 };
 
 template <typename DataT>
-inline typename Writer<DataT>::Ptr Communicator::writer(const std::string &name)
+inline typename Writer<DataT>::Ptr
+Communicator::writer(const std::string &name)
 {
     return local::LocalChannal::writer<DataT>(name);
 }
 
 template <typename DataT>
-inline typename Reader<DataT>::Ptr Communicator::reader(const std::string &name)
+inline typename Reader<DataT>::Ptr
+Communicator::reader(const std::string &name)
 {
     return local::LocalChannal::reader<DataT>(name);
 }
 
 template <typename DataT>
-inline typename Publisher<DataT>::Ptr Communicator::publisher(const std::string &name, const std::size_t &bs)
+inline typename Publisher<DataT>::Ptr
+Communicator::publisher(const std::string &name, const std::size_t &bs)
 {
     return local::LocalChannal::publisher<DataT>(name, bs);
 }
 
 template <typename DataT>
-inline typename Subscriber<DataT>::Ptr Communicator::subscriber(const std::string &name, const typename Subscriber<DataT>::Callback& cb, const std::size_t &bs)
+inline typename Subscriber<DataT>::Ptr
+Communicator::subscriber(const std::string &name, const typename Subscriber<DataT>::Callback& cb, const std::size_t &bs)
 {
     return local::LocalChannal::subscriber<DataT>(name, cb, bs);
 }
 
 template <typename ReqT, typename AckT>
-inline typename Service<ReqT, AckT>::Ptr Communicator::service(const std::string &name, const typename Service<ReqT, AckT>::Callback &cb, const std::size_t &bs)
+inline typename Service<ReqT, AckT>::Ptr
+Communicator::service(const std::string &name, const typename Service<ReqT, AckT>::Callback &cb, const std::size_t &bs)
 {
     return local::LocalChannal::service<ReqT, AckT>(name, cb, bs);
 }
 
 template <typename ReqT, typename AckT>
-inline typename Client<ReqT, AckT>::Ptr Communicator::client(const std::string &name, const std::size_t &bs)
+inline typename Client<ReqT, AckT>::Ptr
+Communicator::client(const std::string &name, const std::size_t &bs)
 {
     return local::LocalChannal::client<ReqT, AckT>(name, bs);
 }

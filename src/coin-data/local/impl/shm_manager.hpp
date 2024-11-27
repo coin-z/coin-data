@@ -13,7 +13,8 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/types.h>
-
+#include <unistd.h>
+#include <sys/types.h>
 #include <memory>
 
 #include <coin-commons/utils/utils.hpp>
@@ -22,6 +23,8 @@
 
 namespace coin::data
 {
+void set_node_shm_root_path(const std::string& path);
+
 class ShmManager
 {
 public:
@@ -34,9 +37,11 @@ public:
     __inner::ShmMemory& mem();
 
     static std::string get_root();
-    static std::string get_node_root_path(const std::string& node);
+    static std::string get_node_root_path(const std::string& node, const std::string& key);
     static std::string get_ctl_key_file  (const std::string& node, const std::string& key);
     static std::string get_data_key_file (const std::string& node, const std::string& key);
+
+    static void update_shm_addr(const std::string& node);
 
     inline const std::string key_file()  const { return key_file_; }
     inline const std::string data_file() const { return data_file_; }

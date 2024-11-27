@@ -50,11 +50,28 @@ int Shm::num_of_attach()
     struct shmid_ds shmds;
     memset(&shmds, 0, sizeof(shmds));
     key_t key = get_key_(key_file_);
+    return num_of_attach_(key);
+}
+int Shm::num_of_attach_(const key_t key)
+{
+    struct shmid_ds shmds;
+    memset(&shmds, 0, sizeof(shmds));
     if(key > 0)
     {
         shmctl(shmget(key, 0, 0), IPC_STAT, &shmds);
     }
     return shmds.shm_nattch;
+}
+int Shm::remove_(const key_t key)
+{
+    if(key < 0) return -1;
+    auto id = shmget(key, 0, 0);
+    coin::Print::warn("{}:{} {} - remove shm of key: {}, id({})", __FILE__, __LINE__, __PRETTY_FUNCTION__, key, id);
+    if(id < 0) return -1;
+
+    coin::Print::warn("{}:{} {} - remove shm of key: {}, id({})", __FILE__, __LINE__, __PRETTY_FUNCTION__, key, id);
+    shmctl(id, IPC_RMID, NULL);
+    return 0;
 }
 bool Shm::is_free()
 {
@@ -111,5 +128,21 @@ void* Shm::addr()
 size_t Shm::size()
 {
     return size_;
+}
+void Shm::check_and_remove(const std::string &key_file)
+{
+    if(not std::filesystem::exists(key_file))
+    {
+        coin::Print::error("key file not exist: {}", key_file);
+        return;
+    }
+    auto key = get_key_(key_file);
+    int num = num_of_attach_(key);
+    coin::Print::warn("check and remove num: {}", num);
+    if(num == 0)
+    {
+        coin::Print::warn("{}:{} {} - remove shm of key file: {}", __FILE__, __LINE__, __PRETTY_FUNCTION__, key_file);
+        remove_(key);
+    }
 }
 } // namespace coin::ipc

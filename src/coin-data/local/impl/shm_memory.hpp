@@ -17,7 +17,7 @@
 #include <coin-data/local/impl/buddy.hpp>
 #include <utility>
 #include <functional>
-
+#include <unistd.h>
 #include <sys/types.h>
 #include <signal.h>
 
@@ -25,9 +25,6 @@ namespace coin::data::__inner
 {
 class ShmMemory
 {
-public:
-    constexpr static std::size_t PAGE_SIZE = 4096;
-
 public:
     ShmMemory(const std::tuple<const std::string, const std::size_t, const void*>& ctl_info, const std::tuple<const std::string, const std::size_t, const void*>& data_info);
     ShmMemory(const std::pair<const std::string, const std::size_t>& ctl_info, const std::pair<const std::string, const std::size_t>& data_info);
@@ -45,6 +42,8 @@ public:
 
     void* const ctl_addr() const;
     void* const data_addr() const;
+
+    static std::size_t page_size();
 
     template<typename T>
     class ProcessLockArea;
@@ -68,7 +67,7 @@ public:
         bool lock();
         bool unlock();
 
-        int timedlock(int ms);
+        int timedlock(size_t ms);
 
         inline pid_t holder() const { return holder_pid_; }
 
@@ -145,8 +144,7 @@ public:
     {
     public:
         ProcessLockArea(MutexT& m,
-            const std::function<void()>& locked_func,
-            const std::function<void()>& failed_func = nullptr, size_t timeout = 1000 /*ms*/)
+            const std::function<void()>& locked_func, size_t timeout = 1000 /*ms*/)
           : m_(m)
         {
             if(not locked_func) return;
@@ -172,31 +170,28 @@ public:
                 }
                 if(kill(m_.owener_pid_, 0) != 0)
                 {
-                    coin::Print::debug("lock {} owener is died, forgive lock.", m_.holder());
+                    coin::Print::debug("lock self({}) holder({}) owener({}) owener is died, forgive lock.", getpid(), m_.holder(), m_.owener_pid_);
                     m_.is_died_ = true;
+                    abort();
+                    break;
                 }
-                if(failed_func)
+                else
                 {
-                    coin::Print::debug("{} call failed_func()", m_.holder());
-                    failed_func();
+                    if(m_.owener_pid_ == getpid())
+                    {
+                        m_.unlock();
+                    }
+                    // forgice this resource, wait for main process unlock it.
+                    coin::Print::debug("lock {:X}, holder: {} owener is working, wait for it.", (uint64_t)this, m_.holder());
+                    return;
                 }
-                return;
             }
 
             if(not m_.is_died_)
             {
                 locked_func();
+                m_.unlock();
             }
-            else
-            {
-                if(failed_func)
-                {
-                    coin::Print::debug("{} call failed_func()", m_.holder());
-                    failed_func();
-                }
-            }
-
-            m_.unlock();
         }
         ~ProcessLockArea() = default;
 

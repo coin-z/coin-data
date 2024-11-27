@@ -16,17 +16,6 @@
 
 namespace coin::data
 {
-namespace __inner
-{
-class MakeResource
-{
-public:
-    MakeResource() { coin::data::local::LocalChannal::instance(); }
-    ~MakeResource() = default;
-};
-MakeResource make_resource;
-};
-
 MutableCommunicator::MutableCommunicator(const std::string& id) : id_(id)
 {
 }
@@ -46,23 +35,17 @@ Communicator::mutable_communicator()
 
 const std::string& Communicator::node_name()
 {
-    return coin::data::local::LocalChannal::instance().selfName();
+    return coin::data::local::LocalChannal::instance().self_name();
 }
 
 Service<Communicator::MutableServerReq, Communicator::MutableServerAck>::Ptr Communicator::mutable_communicator_service_;
-void Communicator::init(int argc, char *argv[])
+void Communicator::init(int argc, char *argv[], const std::string& name)
 {
     coin::data::local::LocalChannal::instance();
-    coin::data::local::LocalChannal::init(argc, argv);
+    coin::data::local::LocalChannal::init(argc, argv, name);
     mutable_communicator_service_ = 
         coin::data::Communicator::service<MutableServerReq, MutableServerAck>("$$/" + node_name() + "/service/mutable_communicator",
             std::bind(&Communicator::mutable_communicator_service_callback_, std::placeholders::_1, std::placeholders::_2));
-
-    spin_once();
-}
-void Communicator::spin_once()
-{
-    coin::data::local::LocalChannal::instance().spin_once();
 }
 
 void Communicator::register_mutable_communicator_(const std::string& id, const MutableCommunicator::Ptr& mc)
@@ -78,31 +61,31 @@ void Communicator::register_mutable_communicator_(const std::string& id, const M
 }
 
 bool Communicator::mutable_communicator_service_callback_(
-        Service<MutableServerReq, MutableServerAck>::ConstReqPtr& req,
-        Service<MutableServerReq, MutableServerAck>::AckPtr& ack
+        const MutableServerReq& req,
+        MutableServerAck& ack
     )
 {
-    ack->is_ok = true;
-    auto id = to_std_string(req->comm_id);
+    ack.is_ok = true;
+    auto id = to_std_string(req.comm_id);
     auto itor = mutable_communicator()->find( id );
     if(itor == mutable_communicator()->end())
     {
-        ack->is_ok = false;
-        ack->msg = from_std_string("communicator <" + id + "> is not exist.");
+        ack.is_ok = false;
+        ack.msg = from_std_string("communicator <" + id + "> is not exist.");
         return true;
     }
 
-    if(req->target_name.empty())
+    if(req.target_name.empty())
     {
-        ack->msg = from_std_string("disconnect.");
-        ack->is_ok = true;
+        ack.msg = from_std_string("disconnect.");
+        ack.is_ok = true;
         itor->second->disconnect();
     }
     else
     {
-        ack->msg = from_std_string("redirect to <" + to_std_string(req->target_name) + ">.");
-        ack->is_ok = true;
-        itor->second->redirect( to_std_string( req->target_name ) );
+        ack.msg = from_std_string("redirect to <" + to_std_string(req.target_name) + ">.");
+        ack.is_ok = true;
+        itor->second->redirect( to_std_string( req.target_name ) );
     }
 
     return true;

@@ -245,7 +245,7 @@ private:
 };
 
 template<typename T, typename AllocT, typename MutexT, typename... ArgsT>
-ShmSharedPtr<T, AllocT, MutexT> makeShmShared(ArgsT&&... args)
+ShmSharedPtr<T, AllocT, MutexT> make_shared_obj(ArgsT&&... args)
 {
     AllocT alloc;
     T* ptr = alloc.allocate(1);

@@ -43,7 +43,7 @@ ShmMemory::~ShmMemory()
 void ShmMemory::initialized()
 {
     // initilize buddy system
-    if(0 > buddy_init_system(shm_info_->addr(), PAGE_SIZE))
+    if(0 > buddy_init_system(shm_info_->addr(), page_size()))
     {
         coin::Print::error("sys info buddy init system failed.");
         exit(-1);
@@ -61,10 +61,25 @@ void ShmMemory::destory()
 }
 void *ShmMemory::malloc(const std::size_t size)
 {
-    return buddy_malloc((struct buddy_head_t* )shm_info_->addr(), size);
+    void* addr = buddy_malloc((struct buddy_head_t* )shm_info_->addr(), size);
+    if(
+        (uint64_t)addr < (uint64_t)shm_data_info_->addr() || \
+        (uint64_t)addr > ((uint64_t)shm_data_info_->addr() + shm_data_info_->size())
+    )
+    {
+        throw std::runtime_error("malloc failed: addr is out of range.");
+    }
+    return addr;
 }
 bool ShmMemory::free(void *mem)
 {
+    if(
+        (uint64_t)mem < (uint64_t)shm_data_info_->addr() || \
+        (uint64_t)mem > ((uint64_t)shm_data_info_->addr() + shm_data_info_->size())
+    )
+    {
+        throw std::runtime_error("free failed: addr is out of range.");
+    }
     return (0 == buddy_free((struct buddy_head_t* )shm_info_->addr(), mem));
 }
 const bool ShmMemory::is_busy() const
@@ -79,6 +94,11 @@ void* const ShmMemory::ctl_addr() const
 void* const ShmMemory::data_addr() const
 {
     return shm_data_info_->addr();
+}
+std::size_t ShmMemory::page_size()
+{
+    static std::size_t page_size = getpagesize();
+    return page_size;
 }
 ShmMemory::ProcessMutex::ProcessMutex()
   : holder_pid_(0)
@@ -137,29 +157,31 @@ bool ShmMemory::ProcessMutex::unlock()
     if(holder_pid_ == 0)
     {
         coin::Print::error("unlock failed: holder_pid_ == 0");
-        abort();
+        return false;
     }
+    pid_t holder = holder_pid_;
     holder_pid_ = 0;
     int r = pthread_mutex_unlock(&mutex_);
     if(EINVAL == r)
     {
-        coin::Print::error("unlock failed: EINVAL({})", r);
-        abort();
+        // std::string msg = fmt::format("unlock failed: EINVAL({})", r);
+        std::string msg = fmt::format("unlock failed: {}({}), holder: {}, owener: {}, self: {}", strerror(r), r, holder, owener_pid_, getpid());
+        throw std::runtime_error(msg);
         return false;
     }
     else if(0 != r)
     {
-        coin::Print::error("unlock failed: {}({})", strerror(r), r);
-        abort();
+        std::string msg = fmt::format("unlock failed: {}({})", strerror(r), r);
+        throw std::runtime_error(msg);
         return false;
     }
     return true;
 }
-int ShmMemory::ProcessMutex::timedlock(int ms)
+int ShmMemory::ProcessMutex::timedlock(size_t ms)
 {
     struct timespec timeout;
     clock_gettime(CLOCK_REALTIME, &timeout);
-    uint64_t now = timeout.tv_sec * 1000 * 1000 * 1000 + timeout.tv_nsec + (ms * 1000);
+    uint64_t now = timeout.tv_sec * 1000 * 1000 * 1000 + timeout.tv_nsec + (ms * 1000000);
 
     timeout.tv_sec = now / 1000 / 1000 / 1000;
     timeout.tv_nsec = now % (1000 * 1000 * 1000);
@@ -176,10 +198,19 @@ int ShmMemory::ProcessMutex::timedlock(int ms)
     {
         
     }
+    else if(ret == EOWNERDEAD)
+    {
+        coin::Print::error("EOWNERDEAD {}({}), {}, {}.\n", strerror(ret), ret, timeout.tv_sec, timeout.tv_nsec);
+    }
+    else if(ret == EDEADLK)
+    {
+        coin::Print::error("EDEADLK {}({}), {}, {}.\n", strerror(ret), ret, timeout.tv_sec, timeout.tv_nsec);
+    }
     else
     {
         coin::Print::error("{}({}), {}, {}.\n", strerror(ret), ret, timeout.tv_sec, timeout.tv_nsec);
-        abort();
+        std::string msg = fmt::format("timedlock failed: {}({})", strerror(ret), ret);
+        throw std::runtime_error(msg);
     }
     return ret;
 }

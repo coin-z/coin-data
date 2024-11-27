@@ -1,39 +1,20 @@
-#include "local/impl/shmobj_manager.hpp"
-#include <communicator.hpp>
-#include <coin-data.hpp>
-#include <thread>
-
+#include <coin-data/coin-data.hpp>
 
 int main(int argc, char* argv[])
 {
-    coin::init(argc, argv);
+    coin::data::init(argc, argv);
 
-    // auto subscriber = coin::data::Communicator::subscriber<uint64_t>("uint64_t",
-    //     [](const coin::data::Subscriber<uint64_t>::DataPtr& data){
-    //         coin::Print::info("subscriber: {}", *data);
-    //     });
+    pid_t pid = getpid();
 
-    auto ptr = coin::data::ShmObjManager::instance().discovery<int>("/publisher/test");
-    auto ptr1 = coin::data::ShmObjManager::instance().discovery<int>("/publisher/test");
-    auto ptr2 = coin::data::ShmObjManager::instance().discovery<int>("/publisher/test");
-    int cnt = 0;
+    auto subscriber = coin::data::subscriber<uint64_t>("/publisher/test/uint64_t",
+        [&pid](const coin::data::Subscriber<uint64_t>::DataPtr& data){
+            auto now = std::chrono::system_clock::now().time_since_epoch().count();
+            coin::Print::info("{} subscriber: {} {}", pid, *data, (now - *data) / 1000);
+        });
+
     while(coin::ok())
     {
-        // if(ptr)
-        // coin::Print::info("used count: {}", ptr.use_count());
-        coin::data::ShmObjManager::lock_object(ptr, [&](){
-            coin::Print::info("ptr: {}", coin::data::ShmObjManager::shared_obj(ptr));
-        });
-        // try
-        // {
-        // }
-        // catch(const std::exception& e)
-        // {
-        //     coin::Print::warn("{}", e.what());
-        // }
-        coin::spin_once();
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        // if(cnt++ > 5) break;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     return 0;
 }

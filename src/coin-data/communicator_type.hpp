@@ -11,7 +11,9 @@
 #pragma once
 #include <string>
 #include <memory>
-#include <coin-data/local/data.hpp>
+
+#include <coin-data/local/impl/shmobj_manager.hpp>
+#include <coin-data/local/local_channal.hpp>
 
 namespace coin::data
 {
@@ -29,7 +31,7 @@ public:
     explicit Writer(const std::string& name) : name_(name) {}
     virtual ~Writer() = default;
 
-    virtual void write(const DataPtr& data) = 0;
+    virtual void write(const DataT& data) = 0;
 
     inline std::string name() const { return name_; }
 protected:
@@ -49,10 +51,11 @@ public:
     explicit Reader(const std::string& name) : name_(name) {}
     virtual ~Reader() = default;
 
-    virtual bool is_update() = 0;
-    virtual ConstDataPtr read() = 0;
-
     inline std::string name() const { return name_; }
+
+    virtual DataT& read() = 0;
+
+    virtual bool lock(const std::function<void()>& area) = 0;
 
 protected:
     const std::string name_;
@@ -94,9 +97,6 @@ public:
     explicit Subscriber(const std::string& name) : name_(name){}
     virtual ~Subscriber() = default;
 
-    virtual bool is_online() = 0;
-    virtual bool is_update() = 0;
-
     inline std::string name() const { return name_; }
 protected:
     const std::string name_;
@@ -114,14 +114,11 @@ public:
     using AckPtr = ShmSharedPtr<AckType>;
     using ConstReqPtr = const ReqPtr;
     using ConstAckPtr = const AckPtr;
-    using Callback = std::function< bool(ConstReqPtr&, AckPtr&) >;
+    using Callback = std::function< bool(const ReqType&, AckType&) >;
 
 public:
     explicit Service(const std::string& name) : name_(name){}
     virtual ~Service() = default;
-
-    virtual bool is_online() = 0;
-    virtual bool is_update() = 0;
 
     inline std::string name() const { return name_; }
 protected:
@@ -145,10 +142,7 @@ public:
     explicit Client(const std::string& name) : name_(name){}
     virtual ~Client() = default;
 
-    virtual bool is_online() = 0;
-    virtual bool is_update() = 0;
-
-    virtual bool call(ConstReqPtr& req, AckPtr& ack) = 0;
+    virtual bool call(std::function<void(ReqType&)>&& req, std::function<void(const AckType&)>&& ack) = 0;
 
     inline std::string name() const { return name_; }
 protected:

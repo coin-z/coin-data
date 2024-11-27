@@ -32,8 +32,12 @@ public:
 
     inline const std::string key_file() const { return key_file_; }
 
+    static void check_and_remove(const std::string& key_file);
+
 private:
-    key_t get_key_(const std::string& key_file);
+    static key_t get_key_(const std::string& key_file);
+    static int num_of_attach_(const key_t key);
+    static int remove_(const key_t key);
 
 private:
     const std::string key_file_;
